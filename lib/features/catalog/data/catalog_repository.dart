@@ -17,6 +17,7 @@ class CatalogRepository {
   List<Category> _cachedCategories = [];
   List<Country> _cachedCountries = [];
   List<Language> _cachedLanguages = [];
+  List<BlockedChannel> _cachedBlockedChannels = [];
   bool _isRefreshing = false;
 
   CatalogRepository({
@@ -29,6 +30,7 @@ class CatalogRepository {
   List<Category> get categories => _cachedCategories;
   List<Country> get countries => _cachedCountries;
   List<Language> get languages => _cachedLanguages;
+  List<BlockedChannel> get blockedChannels => _cachedBlockedChannels;
   bool get isRefreshing => _isRefreshing;
 
   // Stale-While-Revalidate initialization
@@ -83,6 +85,7 @@ class CatalogRepository {
         _cachedCategories = parsed.categories;
         _cachedCountries = parsed.countries;
         _cachedLanguages = parsed.languages;
+        _cachedBlockedChannels = parsed.blockedChannels;
       }
     } catch (e) {
       debugPrint('Error refreshing catalog: $e');
@@ -101,6 +104,32 @@ class CatalogRepository {
   void _deriveTaxonomiesFromChannels() {
     final catMap = <String, Category>{};
     final countryMap = <String, Country>{};
+    final langMap = <String, Language>{};
+
+    const knownLanguages = {
+      'tam': 'Tamil',
+      'hin': 'Hindi',
+      'tel': 'Telugu',
+      'mal': 'Malayalam',
+      'kan': 'Kannada',
+      'eng': 'English',
+      'ara': 'Arabic',
+      'fra': 'French',
+      'spa': 'Spanish',
+      'deu': 'German',
+      'rus': 'Russian',
+      'zho': 'Chinese',
+      'jpn': 'Japanese',
+      'kor': 'Korean',
+      'por': 'Portuguese',
+      'ita': 'Italian',
+      'tur': 'Turkish',
+      'ben': 'Bengali',
+      'pan': 'Punjabi',
+      'mar': 'Marathi',
+      'guj': 'Gujarati',
+      'urd': 'Urdu',
+    };
 
     for (final ch in _cachedChannels) {
       for (final c in ch.categories) {
@@ -115,11 +144,20 @@ class CatalogRepository {
           flag: ch.countryFlag,
         );
       }
+      for (final l in ch.languages) {
+        final code = l.toLowerCase();
+        if (code.isNotEmpty && !langMap.containsKey(code)) {
+          final displayName = knownLanguages[code] ?? code.toUpperCase();
+          langMap[code] = Language(code: code, name: displayName);
+        }
+      }
     }
 
     _cachedCategories = catMap.values.toList()
       ..sort((a, b) => a.name.compareTo(b.name));
     _cachedCountries = countryMap.values.toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+    _cachedLanguages = langMap.values.toList()
       ..sort((a, b) => a.name.compareTo(b.name));
   }
 

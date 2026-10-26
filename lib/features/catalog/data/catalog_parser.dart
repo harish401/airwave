@@ -30,12 +30,14 @@ class ParsedCatalogResult {
   final List<Category> categories;
   final List<Country> countries;
   final List<Language> languages;
+  final List<BlockedChannel> blockedChannels;
 
   const ParsedCatalogResult({
     required this.channels,
     required this.categories,
     required this.countries,
     required this.languages,
+    this.blockedChannels = const [],
   });
 }
 
@@ -49,11 +51,13 @@ class CatalogParser {
   static ParsedCatalogResult _processJoinAndFilter(RawCatalogData raw) {
     // 1. Process Blocklist Set
     final blockedChannelIds = <String>{};
+    final blockedList = <BlockedChannel>[];
     for (final item in raw.blocklistJson) {
       if (item is Map<String, dynamic>) {
-        final ch = item['channel']?.toString();
-        if (ch != null && ch.isNotEmpty) {
-          blockedChannelIds.add(ch);
+        final b = BlockedChannel.fromJson(item);
+        if (b.channel.isNotEmpty) {
+          blockedChannelIds.add(b.channel);
+          blockedList.add(b);
         }
       }
     }
@@ -230,6 +234,7 @@ class CatalogParser {
       categories: categories,
       countries: countries,
       languages: languages,
+      blockedChannels: blockedList,
     );
   }
 }

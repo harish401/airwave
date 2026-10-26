@@ -91,11 +91,18 @@ class _PlayerViewState extends ConsumerState<PlayerView> {
 
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape || _isFullscreen;
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        top: !isLandscape,
-        bottom: !isLandscape,
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          playerNotifier.minimizePlayer();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          top: !isLandscape,
+          bottom: !isLandscape,
         child: isLandscape
             ? _buildVideoSurface(playerState, playerNotifier, allChannels, isLandscape)
             : Column(
@@ -115,6 +122,7 @@ class _PlayerViewState extends ConsumerState<PlayerView> {
                   ),
                 ],
               ),
+        ),
       ),
     );
   }
@@ -231,13 +239,26 @@ class _PlayerViewState extends ConsumerState<PlayerView> {
             child: Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 28),
+                  tooltip: 'Minimize',
                   onPressed: () {
                     if (_isFullscreen) {
                       _toggleFullscreen();
                     } else {
+                      notifier.minimizePlayer();
                       context.pop();
                     }
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.white),
+                  tooltip: 'Close Stream',
+                  onPressed: () {
+                    notifier.closePlayer();
+                    if (_isFullscreen) {
+                      _toggleFullscreen();
+                    }
+                    context.pop();
                   },
                 ),
                 if (ch != null) ...[

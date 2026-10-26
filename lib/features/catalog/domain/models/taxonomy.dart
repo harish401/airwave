@@ -72,3 +72,27 @@ class Language {
         'name': name,
       };
 }
+
+class BlockedChannel {
+  final String channel;
+  final String reason;
+  final String? ref;
+
+  const BlockedChannel({
+    required this.channel,
+    required this.reason,
+    this.ref,
+  });
+
+  factory BlockedChannel.fromJson(Map<String, dynamic> json) => BlockedChannel(
+        channel: json['channel']?.toString() ?? '',
+        reason: json['reason']?.toString() ?? 'blocked',
+        ref: json['ref']?.toString(),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'channel': channel,
+        'reason': reason,
+        'ref': ref,
+      };
+}

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../player/presentation/widgets/mini_player_overlay.dart';
 
 class MainNavView extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
@@ -10,7 +11,12 @@ class MainNavView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: navigationShell,
+      body: Stack(
+        children: [
+          navigationShell,
+          const MiniPlayerOverlay(),
+        ],
+      ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: AppColors.cinemaBlack,

@@ -34,6 +34,8 @@ class PlayerViewState {
   final String? errorMessage;
   final int sleepTimerMinutes;
 
+  final bool isMiniPlayer;
+
   const PlayerViewState({
     this.currentChannel,
     this.currentStreamIndex = 0,
@@ -48,6 +50,7 @@ class PlayerViewState {
     this.statusMessage,
     this.errorMessage,
     this.sleepTimerMinutes = 0,
+    this.isMiniPlayer = false,
   });
 
   PlayerViewState copyWith({
@@ -64,6 +67,7 @@ class PlayerViewState {
     String? statusMessage,
     String? errorMessage,
     int? sleepTimerMinutes,
+    bool? isMiniPlayer,
   }) {
     return PlayerViewState(
       currentChannel: currentChannel ?? this.currentChannel,
@@ -79,6 +83,7 @@ class PlayerViewState {
       statusMessage: statusMessage,
       errorMessage: errorMessage,
       sleepTimerMinutes: sleepTimerMinutes ?? this.sleepTimerMinutes,
+      isMiniPlayer: isMiniPlayer ?? this.isMiniPlayer,
     );
   }
 }
@@ -294,6 +299,22 @@ class PlayerNotifier extends Notifier<PlayerViewState> {
       player.pause();
       state = state.copyWith(isPlaying: false, sleepTimerMinutes: 0);
     });
+  }
+
+  void minimizePlayer() {
+    state = state.copyWith(isMiniPlayer: true);
+  }
+
+  void expandPlayer() {
+    state = state.copyWith(isMiniPlayer: false);
+  }
+
+  void closePlayer() {
+    _frameTimeoutTimer?.cancel();
+    _sleepTimer?.cancel();
+    player.stop();
+    WakelockPlus.disable().ignore();
+    state = const PlayerViewState();
   }
 
   void _startControlsAutoHide() {

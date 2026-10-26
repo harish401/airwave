@@ -163,6 +163,12 @@ final languagesListProvider = Provider<List<Language>>((ref) {
   return repo.languages;
 });
 
+// Blocked channels list provider
+final blockedChannelsProvider = Provider<List<BlockedChannel>>((ref) {
+  final repo = ref.watch(catalogRepositoryProvider);
+  return repo.blockedChannels;
+});
+
 // Favorites Notifier
 class FavoritesNotifier extends AsyncNotifier<List<Channel>> {
   @override
