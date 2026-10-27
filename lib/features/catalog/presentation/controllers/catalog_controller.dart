@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/network/api_client.dart';
@@ -164,9 +165,35 @@ final languagesListProvider = Provider<List<Language>>((ref) {
 });
 
 // Blocked channels list provider
-final blockedChannelsProvider = Provider<List<BlockedChannel>>((ref) {
+final blockedChannelsProvider = FutureProvider<List<BlockedChannel>>((ref) async {
   final repo = ref.watch(catalogRepositoryProvider);
-  return repo.blockedChannels;
+  if (repo.blockedChannels.isNotEmpty) {
+    return repo.blockedChannels;
+  }
+  // Try loading from database or network directly
+  final jsonStr = await ref.watch(appDatabaseProvider).getMetaValue('cached_blocklist');
+  if (jsonStr != null && jsonStr.isNotEmpty) {
+    try {
+      final List<dynamic> decoded = jsonDecode(jsonStr);
+      return decoded
+          .whereType<Map<String, dynamic>>()
+          .map((e) => BlockedChannel.fromJson(e))
+          .toList();
+    } catch (_) {}
+  }
+  // Fallback direct network fetch
+  try {
+    final list = await ref.watch(apiClientProvider).fetchBlocklistOnly();
+    if (list.isNotEmpty) {
+      await ref.watch(appDatabaseProvider).setMetaValue(
+            'cached_blocklist',
+            jsonEncode(list.map((e) => e.toJson()).toList()),
+          );
+    }
+    return list;
+  } catch (_) {
+    return repo.blockedChannels;
+  }
 });
 
 // Favorites Notifier

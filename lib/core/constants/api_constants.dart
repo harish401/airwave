@@ -16,5 +16,5 @@ class ApiConstants {
   static const Duration connectTimeout = Duration(seconds: 15);
   static const Duration receiveTimeout = Duration(seconds: 30);
   static const Duration catalogTtl = Duration(hours: 12);
-  static const Duration playerStreamTimeout = Duration(seconds: 8);
+  static const Duration playerStreamTimeout = Duration(seconds: 14);
 }

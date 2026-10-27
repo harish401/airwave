@@ -174,22 +174,31 @@ class AppDatabase extends _$AppDatabase {
   }
 
   // Metadata / TTL
-  Future<DateTime?> getLastCatalogFetchTime() async {
-    final query = select(appMetaTable)..where((t) => t.metaKey.equals('last_catalog_fetch'));
+  Future<String?> getMetaValue(String key) async {
+    final query = select(appMetaTable)..where((t) => t.metaKey.equals(key));
     final row = await query.getSingleOrNull();
-    if (row != null) {
-      return DateTime.tryParse(row.metaValue);
+    return row?.metaValue;
+  }
+
+  Future<void> setMetaValue(String key, String value) async {
+    await into(appMetaTable).insertOnConflictUpdate(
+      AppMetaTableCompanion.insert(
+        metaKey: key,
+        metaValue: value,
+      ),
+    );
+  }
+
+  Future<DateTime?> getLastCatalogFetchTime() async {
+    final val = await getMetaValue('last_catalog_fetch');
+    if (val != null) {
+      return DateTime.tryParse(val);
     }
     return null;
   }
 
   Future<void> setLastCatalogFetchTime(DateTime time) async {
-    await into(appMetaTable).insertOnConflictUpdate(
-      AppMetaTableCompanion.insert(
-        metaKey: 'last_catalog_fetch',
-        metaValue: time.toIso8601String(),
-      ),
-    );
+    await setMetaValue('last_catalog_fetch', time.toIso8601String());
   }
 
   Channel _rowToChannel(ChannelsTableData row) {

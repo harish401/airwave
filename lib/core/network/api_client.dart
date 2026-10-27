@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import '../constants/api_constants.dart';
 import '../../features/catalog/data/catalog_parser.dart';
+import '../../features/catalog/domain/models/taxonomy.dart';
 
 class ApiClient {
   final Dio _dio;
@@ -86,5 +87,13 @@ class ApiClient {
       // Degrade gracefully with empty list on single endpoint failure
       return const [];
     }
+  }
+
+  Future<List<BlockedChannel>> fetchBlocklistOnly() async {
+    final raw = await _fetchList(ApiConstants.blocklist);
+    return raw
+        .whereType<Map<String, dynamic>>()
+        .map((e) => BlockedChannel.fromJson(e))
+        .toList();
   }
 }

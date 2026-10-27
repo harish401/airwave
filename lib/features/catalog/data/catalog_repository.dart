@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:airwave/core/constants/api_constants.dart';
 import 'package:airwave/core/database/app_database.dart';
@@ -46,12 +47,44 @@ class CatalogRepository {
     if (localChannels.isNotEmpty && !forceRefresh) {
       _cachedChannels = localChannels;
       _deriveTaxonomiesFromChannels();
+      _loadCachedBlockedChannels();
       _checkAndRevalidateInBackground();
       return _cachedChannels;
     }
 
     // 3. Otherwise fetch from network
     return await refreshCatalog();
+  }
+
+  Future<void> _loadCachedBlockedChannels() async {
+    try {
+      final jsonStr = await _db.getMetaValue('cached_blocklist');
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(jsonStr);
+        _cachedBlockedChannels = decoded
+            .whereType<Map<String, dynamic>>()
+            .map((e) => BlockedChannel.fromJson(e))
+            .toList();
+      } else {
+        // If blocklist is not cached yet, fetch it in background
+        _fetchBlockedChannelsOnly().ignore();
+      }
+    } catch (_) {
+      _fetchBlockedChannelsOnly().ignore();
+    }
+  }
+
+  Future<void> _fetchBlockedChannelsOnly() async {
+    try {
+      final list = await _apiClient.fetchBlocklistOnly();
+      if (list.isNotEmpty) {
+        _cachedBlockedChannels = list;
+        await _db.setMetaValue(
+          'cached_blocklist',
+          jsonEncode(list.map((e) => e.toJson()).toList()),
+        );
+      }
+    } catch (_) {}
   }
 
   Future<void> _checkAndRevalidateInBackground() async {
@@ -86,6 +119,12 @@ class CatalogRepository {
         _cachedCountries = parsed.countries;
         _cachedLanguages = parsed.languages;
         _cachedBlockedChannels = parsed.blockedChannels;
+
+        // Persist blocked channels JSON
+        await _db.setMetaValue(
+          'cached_blocklist',
+          jsonEncode(parsed.blockedChannels.map((e) => e.toJson()).toList()),
+        );
       }
     } catch (e) {
       debugPrint('Error refreshing catalog: $e');
@@ -93,6 +132,7 @@ class CatalogRepository {
       if (_cachedChannels.isEmpty) {
         _cachedChannels = await _db.getAllChannels();
         _deriveTaxonomiesFromChannels();
+        _loadCachedBlockedChannels();
       }
     } finally {
       _isRefreshing = false;

@@ -35,7 +35,7 @@ class _BrowseViewState extends ConsumerState<BrowseView> with SingleTickerProvid
     final categories = ref.watch(categoriesListProvider);
     final countries = ref.watch(countriesListProvider);
     final languages = ref.watch(languagesListProvider);
-    final blocked = ref.watch(blockedChannelsProvider);
+    final blockedAsync = ref.watch(blockedChannelsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -68,7 +68,7 @@ class _BrowseViewState extends ConsumerState<BrowseView> with SingleTickerProvid
           // Languages Tab
           _buildLanguagesList(languages),
           // Blocked / Excluded Tab
-          _buildBlockedList(blocked),
+          _buildBlockedTab(blockedAsync),
         ],
       ),
     );
@@ -205,6 +205,21 @@ class _BrowseViewState extends ConsumerState<BrowseView> with SingleTickerProvid
                 ),
         ),
       ],
+    );
+  }
+
+  Widget _buildBlockedTab(AsyncValue<List<dynamic>> blockedAsync) {
+    return blockedAsync.when(
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: AppColors.liveRed),
+      ),
+      error: (e, st) => Center(
+        child: Text(
+          'Failed to load blocked list: $e',
+          style: const TextStyle(color: AppColors.textSecondaryDark),
+        ),
+      ),
+      data: (list) => _buildBlockedList(list),
     );
   }
 
