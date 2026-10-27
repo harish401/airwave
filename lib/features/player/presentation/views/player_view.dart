@@ -36,6 +36,12 @@ class _PlayerViewState extends ConsumerState<PlayerView> {
   }
 
   void _initChannel() {
+    final current = ref.read(playerControllerProvider).currentChannel;
+    if (current != null && current.id == widget.channelId) {
+      // Channel is already loaded into player controller (e.g. from Custom M3U / YouTube / Deep link)
+      return;
+    }
+
     final catalog = ref.read(filteredChannelsProvider);
     final ch = catalog.where((c) => c.id == widget.channelId).firstOrNull;
     if (ch != null) {

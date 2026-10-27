@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 import '../../../core/constants/app_colors.dart';
 import '../../catalog/domain/models/channel.dart';
 import '../../catalog/domain/models/stream_source.dart';
@@ -17,6 +18,9 @@ class MyListView extends ConsumerStatefulWidget {
 
 class _MyListViewState extends ConsumerState<MyListView> with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  final _customNameCtrl = TextEditingController();
+  final _customUrlCtrl = TextEditingController();
+  bool _isExtracting = false;
 
   @override
   void initState() {
@@ -27,6 +31,8 @@ class _MyListViewState extends ConsumerState<MyListView> with SingleTickerProvid
   @override
   void dispose() {
     _tabController.dispose();
+    _customNameCtrl.dispose();
+    _customUrlCtrl.dispose();
     super.dispose();
   }
 
@@ -161,10 +167,7 @@ class _MyListViewState extends ConsumerState<MyListView> with SingleTickerProvid
   }
 
   Widget _buildCustomM3uTab() {
-    final nameCtrl = TextEditingController();
-    final urlCtrl = TextEditingController();
-
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -191,66 +194,160 @@ class _MyListViewState extends ConsumerState<MyListView> with SingleTickerProvid
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Paste your custom live stream link (.m3u8, .ts, or direct HLS URL) to play instantly with full player controls.',
+                  'Paste your custom live stream link (.m3u8, .ts) or any YouTube video link to play with Ad-Free playback & background audio support.',
                   style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
                 ),
                 const SizedBox(height: 16),
                 TextField(
-                  controller: nameCtrl,
+                  controller: _customNameCtrl,
                   decoration: const InputDecoration(
-                    labelText: 'Channel Name',
-                    hintText: 'e.g. My Custom News Live',
+                    labelText: 'Channel / Video Title (Optional)',
+                    hintText: 'e.g. My News / Podcast',
                     isDense: true,
                   ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
-                  controller: urlCtrl,
+                  controller: _customUrlCtrl,
                   decoration: const InputDecoration(
-                    labelText: 'M3U8 Stream URL',
-                    hintText: 'https://example.com/live/stream.m3u8',
+                    labelText: 'Stream URL or YouTube Link',
+                    hintText: 'https://youtube.com/watch?v=... or .m3u8',
                     isDense: true,
                   ),
                 ),
                 const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    final url = urlCtrl.text.trim();
-                    if (url.isEmpty || !url.startsWith('http')) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please enter a valid HTTP/HTTPS M3U8 URL')),
-                      );
-                      return;
-                    }
-                    final name = nameCtrl.text.trim().isEmpty ? 'Custom Stream' : nameCtrl.text.trim();
-                    // Load into player directly
-                    final customChannel = Channel(
-                      id: 'custom_${DateTime.now().millisecondsSinceEpoch}',
-                      name: name,
-                      streams: [StreamSource(url: url, channel: 'custom')],
-                    );
-                    ref.read(playerControllerProvider.notifier).loadChannel(customChannel);
-                    context.push('/player/${customChannel.id}');
-                  },
-                  icon: const Icon(Icons.play_circle_fill_rounded, color: Colors.white),
-                  label: const Text('Play Custom Stream', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.liveRed,
-                    minimumSize: const Size.fromHeight(44),
+                if (_isExtracting)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.liveRed.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.liveRed.withOpacity(0.4)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.liveRed),
+                        ),
+                        SizedBox(width: 12),
+                        Text(
+                          'Extracting Ad-Free YouTube Stream...',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      final input = _customUrlCtrl.text.trim();
+                      if (input.isEmpty || !input.startsWith('http')) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Please enter a valid HTTP/HTTPS URL or YouTube link')),
+                        );
+                        return;
+                      }
+
+                      final name = _customNameCtrl.text.trim().isEmpty ? 'Stream' : _customNameCtrl.text.trim();
+                      final isYouTube = input.contains('youtube.com') || input.contains('youtu.be');
+
+                      if (isYouTube) {
+                        setState(() => _isExtracting = true);
+
+                        try {
+                          final ytExplode = yt.YoutubeExplode();
+                          final video = await ytExplode.videos.get(input);
+                          final manifest = await ytExplode.videos.streamsClient.getManifest(video.id);
+
+                          final streamSources = <StreamSource>[];
+
+                          // Best Video+Audio muxed stream (Audio + Video interleaved together)
+                          if (manifest.muxed.isNotEmpty) {
+                            final bestMuxed = manifest.muxed.withHighestBitrate();
+                            streamSources.add(
+                              StreamSource(
+                                url: bestMuxed.url.toString(),
+                                channel: 'youtube',
+                                title: 'YouTube Video (${bestMuxed.videoQuality.name})',
+                                quality: bestMuxed.videoQuality.name,
+                                userAgent: 'NONE', // Special token so player doesn't inject mobile Safari header
+                              ),
+                            );
+                          }
+
+                          // Best High Quality Audio-Only stream (ideal for background listening / podcast)
+                          if (manifest.audioOnly.isNotEmpty) {
+                            final bestAudio = manifest.audioOnly.withHighestBitrate();
+                            streamSources.add(
+                              StreamSource(
+                                url: bestAudio.url.toString(),
+                                channel: 'youtube',
+                                title: 'YouTube Audio-Only (${bestAudio.bitrate})',
+                                quality: 'Audio',
+                                userAgent: 'NONE',
+                              ),
+                            );
+                          }
+
+                          ytExplode.close();
+
+                          if (!mounted) return;
+                          setState(() => _isExtracting = false);
+
+                          if (streamSources.isEmpty) {
+                            throw Exception('No playable stream found for this YouTube video.');
+                          }
+
+                          final ytChannel = Channel(
+                            id: 'yt_${video.id.value}',
+                            name: video.title,
+                            logoUrl: video.thumbnails.highResUrl,
+                            streams: streamSources,
+                          );
+
+                          ref.read(playerControllerProvider.notifier).loadChannel(ytChannel);
+                          context.push('/player/${ytChannel.id}');
+                        } catch (e) {
+                          if (mounted) {
+                            setState(() => _isExtracting = false);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Failed to extract YouTube stream: $e')),
+                            );
+                          }
+                        }
+                      } else {
+                        // Standard M3U8 / Live TV stream
+                        final customChannel = Channel(
+                          id: 'custom_${DateTime.now().millisecondsSinceEpoch}',
+                          name: name,
+                          streams: [StreamSource(url: input, channel: 'custom')],
+                        );
+                        ref.read(playerControllerProvider.notifier).loadChannel(customChannel);
+                        context.push('/player/${customChannel.id}');
+                      }
+                    },
+                    icon: const Icon(Icons.play_circle_fill_rounded, color: Colors.white),
+                    label: const Text('Play Stream / YouTube Video', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.liveRed,
+                      minimumSize: const Size.fromHeight(44),
+                    ),
                   ),
-                ),
               ],
             ),
           ),
           const SizedBox(height: 24),
           const Text(
-            'Supported Formats:',
+            'Supported Formats & Links:',
             style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 6),
           const Text(
-            '• HLS (.m3u8) Live TV Streams\n• MPEG-DASH / MPD Broadcasts\n• Transport Streams (.ts)\n• HTTP / HTTPS Direct Media URLs',
-            style: TextStyle(color: AppColors.textTertiaryDark, fontSize: 12, height: 1.5),
+            '• 🎬 YouTube Video Links (Ad-Free + Background Audio)\n• 📺 HLS (.m3u8) Live TV Streams\n• ⚡ Transport Streams (.ts) & Direct Media URLs\n• 📻 Online Web Radio Streams',
+            style: TextStyle(color: AppColors.textTertiaryDark, fontSize: 12, height: 1.6),
           ),
         ],
       ),

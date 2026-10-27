@@ -174,6 +174,11 @@ class PlayerNotifier extends Notifier<PlayerViewState> {
 
     _errorSub = player.stream.error.listen((err) {
       debugPrint('MediaKit error: $err');
+      // On iOS Simulator, coreaudio frequently logs "Could not open/initialize audio device -> no sound."
+      // This is a simulator audio output warning and NOT a fatal stream network failure.
+      if (err.contains('audio device') || err.contains('no sound')) {
+        return;
+      }
       _handleStreamFailure();
     });
 
@@ -219,19 +224,22 @@ class PlayerNotifier extends Notifier<PlayerViewState> {
 
   Future<void> _playStream(StreamSource stream) async {
     try {
+      final isYouTube = stream.url.contains('googlevideo.com') || stream.channel == 'youtube';
       final headers = <String, String>{};
-      // Provide desktop/mobile browser user agent if none given so streams don't block
-      headers['User-Agent'] = stream.userAgent != null && stream.userAgent!.isNotEmpty
-          ? stream.userAgent!
-          : 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1';
 
-      if (stream.referrer != null && stream.referrer!.isNotEmpty) {
-        headers['Referer'] = stream.referrer!;
+      if (!isYouTube && stream.userAgent != 'NONE') {
+        headers['User-Agent'] = stream.userAgent != null && stream.userAgent!.isNotEmpty
+            ? stream.userAgent!
+            : 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1';
+
+        if (stream.referrer != null && stream.referrer!.isNotEmpty) {
+          headers['Referer'] = stream.referrer!;
+        }
       }
 
       final media = Media(
         stream.url,
-        httpHeaders: headers,
+        httpHeaders: headers.isNotEmpty ? headers : null,
       );
 
       await player.open(media, play: true);
